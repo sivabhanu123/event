@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Wedding Organizer</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .admin-header {
+            background-color: #ff6b6b;
+            color: white;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #ff6b6b;
+        }
+        .nav-pills .nav-link {
+            color: #ff6b6b;
+        }
+        .booking-card {
+            border-left: 4px solid #ff6b6b;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        .booking-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .pending {
+            border-left-color: #ffc107;
+        }
+        .accepted {
+            border-left-color: #28a745;
+        }
+        .rejected {
+            border-left-color: #dc3545;
+        }
+        .status-badge {
+            font-size: 0.8rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+        }
+        .badge-pending {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .badge-accepted {
+            background-color: #28a745;
+            color: white;
+        }
+        .badge-rejected {
+            background-color: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Form -->
+    <div id="loginSection" class="login-container">
+        <h2 class="text-center mb-4">Admin Login</h2>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label for="adminEmail" class="form-label">Email</label>
+                <input type="email" class="form-control" id="adminEmail" required>
+            </div>
+            <div class="mb-3">
+                <label for="adminPassword" class="form-label">Password</label>
+                <input type="password" class="form-control" id="adminPassword" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100" style="background-color: #ff6b6b; border-color: #ff6b6b;">Login</button>
+        </form>
+    </div>
+
+    <!-- Admin Dashboard (Hidden until login) -->
+    <div id="adminDashboard" class="container-fluid d-none">
+        <div class="admin-header p-3 mb-4 shadow">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">Wedding Organizer Admin Panel</h2>
+                <button id="logoutBtn" class="btn btn-light">Logout</button>
+            </div>
+        </div>
+
+        <div class="container">
+            <ul class="nav nav-pills mb-4" id="bookingTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="pending-tab" data-bs-toggle="pill" data-bs-target="#pending" type="button" role="tab">Pending</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="accepted-tab" data-bs-toggle="pill" data-bs-target="#accepted" type="button" role="tab">Accepted</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="rejected-tab" data-bs-toggle="pill" data-bs-target="#rejected" type="button" role="tab">Rejected</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="bookingTabsContent">
+                <div class="tab-pane fade show active" id="pending" role="tabpanel">
+                    <h4 class="mb-4">Pending Bookings</h4>
+                    <div id="pendingBookings"></div>
+                </div>
+                <div class="tab-pane fade" id="accepted" role="tabpanel">
+                    <h4 class="mb-4">Accepted Bookings</h4>
+                    <div id="acceptedBookings"></div>
+                </div>
+                <div class="tab-pane fade" id="rejected" role="tabpanel">
+                    <h4 class="mb-4">Rejected Bookings</h4>
+                    <div id="rejectedBookings"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if admin is already logged in
+            if (localStorage.getItem('adminLoggedIn') === 'true') {
+                showAdminDashboard();
+                loadBookings();
+            }
+
+            // Handle login form submission
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const email = document.getElementById('adminEmail').value;
+                const password = document.getElementById('adminPassword').value;
+                
+                // Check credentials (admin@123.com / 123)
+                if (email === 'admin@123.com' && password === '123') {
+                    localStorage.setItem('adminLoggedIn', 'true');
+                    showAdminDashboard();
+                    loadBookings();
+                } else {
+                    alert('Invalid credentials! Please try again.');
+                }
+            });
+
+            // Handle logout
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.removeItem('adminLoggedIn');
+                window.location.reload();
+            });
+
+            function showAdminDashboard() {
+                document.getElementById('loginSection').classList.add('d-none');
+                document.getElementById('adminDashboard').classList.remove('d-none');
+            }
+
+            function loadBookings() {
+                const bookings = JSON.parse(localStorage.getItem('weddingBookings')) || [];
+                
+                // Initialize status if not exists
+                bookings.forEach(booking => {
+                    if (!booking.status) {
+                        booking.status = 'pending';
+                    }
+                });
+                
+                // Save back to localStorage
+                localStorage.setItem('weddingBookings', JSON.stringify(bookings));
+                
+                // Filter bookings by status
+                const pending = bookings.filter(b => b.status === 'pending');
+                const accepted = bookings.filter(b => b.status === 'accepted');
+                const rejected = bookings.filter(b => b.status === 'rejected');
+                
+                // Display bookings
+                displayBookings(pending, 'pendingBookings');
+                displayBookings(accepted, 'acceptedBookings');
+                displayBookings(rejected, 'rejectedBookings');
+            }
+
+            function displayBookings(bookings, containerId) {
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+                
+                if (bookings.length === 0) {
+                    container.innerHTML = '<div class="alert alert-info">No bookings found</div>';
+                    return;
+                }
+                
+                bookings.forEach((booking, index) => {
+                    const bookingCard = document.createElement('div');
+                    bookingCard.className = `card booking-card ${booking.status} mb-3`;
+                    
+                    const statusBadge = `<span class="badge status-badge badge-${booking.status} float-end">${booking.status.toUpperCase()}</span>`;
+                    
+                    bookingCard.innerHTML = `
+                        <div class="card-body">
+                            ${statusBadge}
+                            <h5 class="card-title">${booking.fullName}</h5>
+                            <h6 class="card-subtitle mb-2 text-muted">${booking.product || 'Wedding Service'}</h6>
+                            <p class="card-text">
+                                <strong>Email:</strong> ${booking.email}<br>
+                                <strong>Date:</strong> ${booking.bookingDate}<br>
+                                <strong>Type:</strong> ${booking.destinationType}<br>
+                                <strong>Address:</strong> ${booking.address}, ${booking.state}
+                            </p>
+                            <small class="text-muted">Submitted: ${new Date(booking.timestamp).toLocaleString()}</small>
+                            
+                            ${booking.status === 'pending' ? `
+                            <div class="mt-3">
+                                <button class="btn btn-sm btn-success me-2 accept-btn" data-index="${index}">Accept</button>
+                                <button class="btn btn-sm btn-danger reject-btn" data-index="${index}">Reject</button>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    
+                    container.appendChild(bookingCard);
+                });
+                
+                // Add event listeners to action buttons
+                if (containerId === 'pendingBookings') {
+                    document.querySelectorAll('.accept-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            updateBookingStatus(this.getAttribute('data-index'), 'accepted');
+                        });
+                    });
+                    
+                    document.querySelectorAll('.reject-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            updateBookingStatus(this.getAttribute('data-index'), 'rejected');
+                        });
+                    });
+                }
+            }
+
+            function updateBookingStatus(index, status) {
+                const bookings = JSON.parse(localStorage.getItem('weddingBookings'));
+                bookings[index].status = status;
+                localStorage.setItem('weddingBookings', JSON.stringify(bookings));
+                loadBookings();
+            }
+
+            function displayBookings(bookings, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    
+    if (bookings.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No bookings found</div>';
+        return;
+    }
+    
+    // Get the full bookings array to find original indices
+    const allBookings = JSON.parse(localStorage.getItem('weddingBookings')) || [];
+    
+    bookings.forEach((booking) => {
+        // Find the original index in the full bookings array
+        const originalIndex = allBookings.findIndex(b => 
+            b.timestamp === booking.timestamp && 
+            b.email === booking.email
+        );
+        
+        const bookingCard = document.createElement('div');
+        bookingCard.className = `card booking-card ${booking.status} mb-3`;
+        
+        const statusBadge = `<span class="badge status-badge badge-${booking.status} float-end">${booking.status.toUpperCase()}</span>`;
+        
+        bookingCard.innerHTML = `
+            <div class="card-body">
+                ${statusBadge}
+                <h5 class="card-title">${booking.fullName}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">${booking.product || 'Wedding Service'}</h6>
+                <p class="card-text">
+                    <strong>Email:</strong> ${booking.email}<br>
+                    <strong>Date:</strong> ${booking.bookingDate}<br>
+                    <strong>Type:</strong> ${booking.destinationType}<br>
+                    <strong>Address:</strong> ${booking.address}, ${booking.state}
+                </p>
+                <small class="text-muted">Submitted: ${new Date(booking.timestamp).toLocaleString()}</small>
+                
+                ${booking.status === 'pending' ? `
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-success me-2 accept-btn" data-index="${originalIndex}">Accept</button>
+                    <button class="btn btn-sm btn-danger reject-btn" data-index="${originalIndex}">Reject</button>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
+        container.appendChild(bookingCard);
+    });
+    
+    // Add event listeners to action buttons
+    if (containerId === 'pendingBookings') {
+        document.querySelectorAll('.accept-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateBookingStatus(parseInt(this.getAttribute('data-index')), 'accepted');
+            });
+        });
+        
+        document.querySelectorAll('.reject-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                updateBookingStatus(parseInt(this.getAttribute('data-index')), 'rejected');
+            });
+        });
+    }
+}
+
+function updateBookingStatus(index, status) {
+    const bookings = JSON.parse(localStorage.getItem('weddingBookings')) || [];
+    if (index >= 0 && index < bookings.length) {
+        bookings[index].status = status;
+        localStorage.setItem('weddingBookings', JSON.stringify(bookings));
+        loadBookings();
+    }
+}
+        });
+    </script>
+</body>
+</html>
